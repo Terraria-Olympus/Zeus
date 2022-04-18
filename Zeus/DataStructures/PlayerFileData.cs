@@ -6,6 +6,7 @@ namespace Zeus.DataStructures
 {
     public class PlayerFileData
     {
+        public string Name;
         public List<JourneyItemResearchInfo> CreativeSacs = new();
 
         public static PlayerFileData Load(string path)
@@ -32,7 +33,7 @@ namespace Zeus.DataStructures
             }
 
             // Read name bytes
-            reader.ReadString();
+            ret.Name = reader.ReadString();
 
             if (fileVersion > 248)
                 return null;

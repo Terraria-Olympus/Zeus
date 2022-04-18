@@ -7,7 +7,14 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.1" />
     <PackageReference Include="System.Security.Cryptography.Algorithms" Version="4.3.1" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Update="Sacrifices.tsv">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
   </ItemGroup>
 
 </Project>
