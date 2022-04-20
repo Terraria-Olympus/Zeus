@@ -13,8 +13,8 @@ namespace Zeus
 
         public static void WriteTitle()
         {
-            Console.WriteLine();
             Console.WriteLine(Title);
+            Console.WriteLine();
         }
     }
 }

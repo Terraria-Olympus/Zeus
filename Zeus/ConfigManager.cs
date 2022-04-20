@@ -6,7 +6,7 @@ namespace Zeus
 {
     public class ConfigManager
     {
-        public string ConfigPath => Path.Combine(Environment.CurrentDirectory, "config.toml");
+        public string ConfigPath => Path.Combine(Environment.CurrentDirectory, "ZeusConfig.toml");
 
         public ConfigData Data = new ConfigData();
 
