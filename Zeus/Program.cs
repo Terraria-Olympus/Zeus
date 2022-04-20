@@ -1,13 +1,10 @@
-﻿using ImGuiNET;
-using System;
-using System.IO;
+﻿using System;
 using System.Numerics;
-using System.Reflection;
+using System.Threading;
 using Veldrid;
 using Veldrid.Sdl2;
 using Veldrid.StartupUtilities;
 using Zeus.Engine;
-using static ImGuiNET.ImGuiNative;
 
 namespace Zeus
 {
@@ -29,41 +26,69 @@ namespace Zeus
             debug = true;
 #endif
 
-            AppDomain.CurrentDomain.AssemblyResolve += AssemblyResolve;
-
             AsciiTitle.WriteTitle();
 
             Config = new();
 
-            Console.WriteLine("Creating window...");
-            int width = 400;
-            int height = 500;
-            
-            VeldridStartup.CreateWindowAndGraphicsDevice(
-                new WindowCreateInfo(50, 50, width, height, WindowState.Normal, "Zeus"),
-                new GraphicsDeviceOptions(debug, null, true, ResourceBindingModel.Improved, true, true),
-                out Window,
-                out GraphicsDevice);
-            Window.Resizable = false;
-            Window.Resized += () => {
-                GraphicsDevice.MainSwapchain.Resize((uint)Window.Width, (uint)Window.Height);
-                Controller.WindowResized(Window.Width, Window.Height);
-            };
-
-            Console.WriteLine("Creating command list...");
-            CommandList = GraphicsDevice.ResourceFactory.CreateCommandList();
-
-            Console.WriteLine("Creating ImGui controller...");
-            Controller = new ImGuiController(GraphicsDevice, GraphicsDevice.MainSwapchain.Framebuffer.OutputDescription, Window.Width, Window.Height);
+            InitializeGraphics(debug);
 
             Console.WriteLine("Entering main loop.");
+            Thread.Sleep(1000);
+            Utils.HideConsole();
+            Window.Visible = true;
+
+            MainLoop();
+
+            Utils.ShowConsole();
+            Console.WriteLine();
+
+            CleanUp();
+
+            Console.Write("All resources cleaned up! Press any key to exit.");
+            Console.ReadKey();
+        }
+
+        private static void InitializeGraphics(bool debug)
+        {
+            Console.Write("Creating window...");
+            Utils.TryDo(() => {
+                const int width = 400;
+                const int height = 500;
+
+                VeldridStartup.CreateWindowAndGraphicsDevice(
+                    new WindowCreateInfo(50, 50, width, height, WindowState.Hidden, "Zeus"),
+                    new GraphicsDeviceOptions(debug, null, true, ResourceBindingModel.Improved, true, true),
+                    out Window,
+                    out GraphicsDevice);
+                
+                Window.Resizable = false;
+                Window.Visible = false;
+                Window.Resized += () => {
+                    GraphicsDevice.MainSwapchain.Resize((uint)Window.Width, (uint)Window.Height);
+                    Controller.WindowResized(Window.Width, Window.Height);
+                };
+            });
+
+            Console.Write("Creating command list...");
+            Utils.TryDo(() => {
+                CommandList = GraphicsDevice.ResourceFactory.CreateCommandList();
+            });
+
+            Console.Write("Creating ImGui controller...");
+            Utils.TryDo(() => {
+                Controller = new ImGuiController(GraphicsDevice, GraphicsDevice.MainSwapchain.Framebuffer.OutputDescription, Window.Width, Window.Height);
+            });
+        }
+
+        private static void MainLoop()
+        {
             while (Window.Exists)
             {
                 InputSnapshot snapshot = Window.PumpEvents();
                 if (!Window.Exists) { break; }
                 Controller.Update(1f / 60f, snapshot); // Feed the input events to our ImGui controller, which passes them through to ImGui.
 
-                SubmitZeusUI();
+                UI.Draw();
 
                 CommandList.Begin();
                 CommandList.SetFramebuffer(GraphicsDevice.MainSwapchain.Framebuffer);
@@ -73,71 +98,27 @@ namespace Zeus
                 GraphicsDevice.SubmitCommands(CommandList);
                 GraphicsDevice.SwapBuffers(GraphicsDevice.MainSwapchain);
             }
-
-            Console.WriteLine("Window closed! Cleaning up Veldrid resources...");
-            GraphicsDevice.WaitForIdle();
-            Controller.Dispose();
-            CommandList.Dispose();
-            GraphicsDevice.Dispose();
-
-            Console.WriteLine("Saving config...");
-            Config.Save();
-
-            Console.WriteLine("Veldrid resources cleaned up! Press any key to exit.");
-            Console.ReadKey();
         }
 
-        private static Assembly AssemblyResolve(object sender, ResolveEventArgs args)
+        private static void CleanUp()
         {
-            Console.WriteLine("Resovling " + args.Name);
-            
-            string path = Path.Combine(Environment.CurrentDirectory, "libs", args.Name + ".dll");
+            Console.Write("Cleaning up graphics resources...");
+            Utils.TryDo(() => {
+                GraphicsDevice.WaitForIdle();
 
-            if (File.Exists(path))
-                return Assembly.LoadFrom(path);
+                if (Controller != null) Controller.Dispose();
+                if (CommandList != null) CommandList.Dispose();
+                if (GraphicsDevice != null) GraphicsDevice.Dispose();
+            });
 
-            throw new Exception("Could not resolve " + args.Name);
-        }
-
-        private static unsafe void SubmitZeusUI()
-        {
-            switch (Config.Data.Theme) {
-                case "Dark": ImGui.StyleColorsDark(); break;
-                case "Light": ImGui.StyleColorsLight(); break;
-                default:  ImGui.StyleColorsDark(); break;
-            }
-            
-            ImGui.SetNextWindowPos(new(0, 0));
-            ImGui.SetNextWindowSize(new(Window.Width, 400));
-            ImGui.Begin("Item Checklist", ImGuiWindowFlags.NoMove | ImGuiWindowFlags.NoResize | ImGuiWindowFlags.NoCollapse);
-            
-            ImGui.End();
-
-            ImGui.SetNextWindowPos(new(0, 400));
-            ImGui.SetNextWindowSize(new(Window.Width, 100));
-            ImGui.Begin("Settings", ImGuiWindowFlags.NoMove | ImGuiWindowFlags.NoResize | ImGuiWindowFlags.NoCollapse);
-            
-            ImGui.Text("Player to track: ");
-            ImGui.SameLine();
-            ImGui.InputText("", ref EngineManager.CurrentlyTrackedPlayerName, 32);
-
-            ImGui.Text("Theme:");
-            ImGui.SameLine();
-            if (ImGui.RadioButton("Dark", Config.Data.Theme == "Dark")) Config.Data.Theme = "Dark";
-            ImGui.SameLine();
-            if (ImGui.RadioButton("Light", Config.Data.Theme == "Light")) Config.Data.Theme = "Light";
-
-            if (!EngineManager.Initialized)
+            if (EngineManager.Initialized)
             {
-                if (ImGui.Button("Initialize Mode A."))
-                    ;
-
-                ImGui.SameLine();
-                if (ImGui.Button("Initialize Mode B."))
-                    ;
+                Console.Write("Disposing engine...");
+                Utils.TryDo(EngineManager.Dispose);
             }
 
-            ImGui.End();
+            Console.Write("Saving config...");
+            Utils.TryDo(Config.Save);
         }
     }
 }

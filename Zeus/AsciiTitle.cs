@@ -1,8 +1,4 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace Zeus
 {
@@ -17,8 +13,8 @@ namespace Zeus
 
         public static void WriteTitle()
         {
-            Console.WriteLine();
             Console.WriteLine(Title);
+            Console.WriteLine();
         }
     }
 }

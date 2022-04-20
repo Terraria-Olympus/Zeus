@@ -1,16 +1,12 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.IO;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using Tomlet;
 
 namespace Zeus
 {
     public class ConfigManager
     {
-        public string ConfigPath => Path.Combine(Environment.CurrentDirectory, "config.toml");
+        public string ConfigPath => Path.Combine(Environment.CurrentDirectory, "ZeusConfig.toml");
 
         public ConfigData Data = new ConfigData();
 
