@@ -1,11 +1,10 @@
 ﻿using System;
-using System.IO;
 using System.Numerics;
-using System.Reflection;
 using System.Threading;
 using Veldrid;
 using Veldrid.Sdl2;
 using Veldrid.StartupUtilities;
+using Zeus.Engine;
 
 namespace Zeus
 {
@@ -31,33 +30,58 @@ namespace Zeus
 
             Config = new();
 
-            Console.WriteLine("Creating window...");
-            int width = 400;
-            int height = 500;
+            InitializeGraphics(debug);
 
-            VeldridStartup.CreateWindowAndGraphicsDevice(
-                new WindowCreateInfo(50, 50, width, height, WindowState.Hidden, "Zeus"),
-                new GraphicsDeviceOptions(debug, null, true, ResourceBindingModel.Improved, true, true),
-                out Window,
-                out GraphicsDevice);
-            Window.Resizable = false;
-            Window.Visible = false;
-            Window.Resized += () => {
-                GraphicsDevice.MainSwapchain.Resize((uint)Window.Width, (uint)Window.Height);
-                Controller.WindowResized(Window.Width, Window.Height);
-            };
-
-            Console.WriteLine("Creating command list...");
-            CommandList = GraphicsDevice.ResourceFactory.CreateCommandList();
-
-            Console.WriteLine("Creating ImGui controller...");
-            Controller = new ImGuiController(GraphicsDevice, GraphicsDevice.MainSwapchain.Framebuffer.OutputDescription, Window.Width, Window.Height);
-
-            Console.WriteLine("Entering main loop...");
+            Console.WriteLine("Entering main loop.");
             Thread.Sleep(1000);
             Utils.HideConsole();
             Window.Visible = true;
-            
+
+            MainLoop();
+
+            Utils.ShowConsole();
+            Console.WriteLine();
+
+            CleanUp();
+
+            Console.Write("All resources cleaned up! Press any key to exit.");
+            Console.ReadKey();
+        }
+
+        private static void InitializeGraphics(bool debug)
+        {
+            Console.Write("Creating window...");
+            Utils.TryDo(() => {
+                const int width = 400;
+                const int height = 500;
+
+                VeldridStartup.CreateWindowAndGraphicsDevice(
+                    new WindowCreateInfo(50, 50, width, height, WindowState.Hidden, "Zeus"),
+                    new GraphicsDeviceOptions(debug, null, true, ResourceBindingModel.Improved, true, true),
+                    out Window,
+                    out GraphicsDevice);
+                
+                Window.Resizable = false;
+                Window.Visible = false;
+                Window.Resized += () => {
+                    GraphicsDevice.MainSwapchain.Resize((uint)Window.Width, (uint)Window.Height);
+                    Controller.WindowResized(Window.Width, Window.Height);
+                };
+            });
+
+            Console.Write("Creating command list...");
+            Utils.TryDo(() => {
+                CommandList = GraphicsDevice.ResourceFactory.CreateCommandList();
+            });
+
+            Console.Write("Creating ImGui controller...");
+            Utils.TryDo(() => {
+                Controller = new ImGuiController(GraphicsDevice, GraphicsDevice.MainSwapchain.Framebuffer.OutputDescription, Window.Width, Window.Height);
+            });
+        }
+
+        private static void MainLoop()
+        {
             while (Window.Exists)
             {
                 InputSnapshot snapshot = Window.PumpEvents();
@@ -74,20 +98,27 @@ namespace Zeus
                 GraphicsDevice.SubmitCommands(CommandList);
                 GraphicsDevice.SwapBuffers(GraphicsDevice.MainSwapchain);
             }
-            Utils.ShowConsole();
-            Console.WriteLine();
+        }
 
-            Console.WriteLine("Window closed! Cleaning up Veldrid resources...");
-            GraphicsDevice.WaitForIdle();
-            Controller.Dispose();
-            CommandList.Dispose();
-            GraphicsDevice.Dispose();
+        private static void CleanUp()
+        {
+            Console.Write("Cleaning up graphics resources...");
+            Utils.TryDo(() => {
+                GraphicsDevice.WaitForIdle();
 
-            Console.WriteLine("Saving config...");
-            Config.Save();
+                if (Controller != null) Controller.Dispose();
+                if (CommandList != null) CommandList.Dispose();
+                if (GraphicsDevice != null) GraphicsDevice.Dispose();
+            });
 
-            Console.WriteLine("Veldrid resources cleaned up! Press any key to exit.");
-            Console.ReadKey();
+            if (EngineManager.Initialized)
+            {
+                Console.Write("Disposing engine...");
+                Utils.TryDo(EngineManager.Dispose);
+            }
+
+            Console.Write("Saving config...");
+            Utils.TryDo(Config.Save);
         }
     }
 }
