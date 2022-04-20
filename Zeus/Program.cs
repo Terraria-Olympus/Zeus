@@ -1,13 +1,15 @@
-﻿using ImGuiNET;
+﻿using Alpha;
+using Alpha.ID;
+using ImGuiNET;
 using System;
 using System.IO;
+using System.Linq;
 using System.Numerics;
 using System.Reflection;
 using Veldrid;
 using Veldrid.Sdl2;
 using Veldrid.StartupUtilities;
 using Zeus.Engine;
-using static ImGuiNET.ImGuiNative;
 
 namespace Zeus
 {
@@ -49,6 +51,7 @@ namespace Zeus
                 GraphicsDevice.MainSwapchain.Resize((uint)Window.Width, (uint)Window.Height);
                 Controller.WindowResized(Window.Width, Window.Height);
             };
+            //Sdl2Native.SDL_SetWindowBordered(new(Window.Handle), 0);
 
             Console.WriteLine("Creating command list...");
             CommandList = GraphicsDevice.ResourceFactory.CreateCommandList();
@@ -110,16 +113,50 @@ namespace Zeus
             ImGui.SetNextWindowPos(new(0, 0));
             ImGui.SetNextWindowSize(new(Window.Width, 400));
             ImGui.Begin("Item Checklist", ImGuiWindowFlags.NoMove | ImGuiWindowFlags.NoResize | ImGuiWindowFlags.NoCollapse);
-            
+
+            if (EngineManager.Initialized)
+            {
+                string searchText = "";
+                ImGui.InputText("Item name search", ref searchText, 32);
+                
+                ImGui.BeginListBox("", new(400, 300));
+                for (int i = 0; i < ItemID.Count; i++)
+                {
+                    ResearchedItemStatus status = EngineManager.ResearchedItemAmounts[i];
+
+                    if (status.Researched ||
+                        (!string.IsNullOrEmpty(searchText) && !status.Name.ToLower().Contains(Utils.RemoveSpaces(searchText).ToLower())))
+                        continue;
+
+                    ImGui.Text($"{Utils.AddSpacesAfterCaps(status.Name)}: {status.Current}/{status.Needed}");
+                }
+                ImGui.EndListBox();
+
+                float amountCompleted = EngineManager.ResearchedItemAmounts.Count(x => x.Needed != 0 && x.Researched);
+                float amountNeeded = ItemID.Count - EngineManager.NonResearchableItems;
+                ImGui.Text(amountCompleted + "/" + amountNeeded);
+                ImGui.SameLine();
+                ImGui.Text($"({(amountCompleted / amountNeeded):00.00}%)");
+            }
+            else
+                ImGui.Text("Engine not initialized.");
+
             ImGui.End();
 
             ImGui.SetNextWindowPos(new(0, 400));
             ImGui.SetNextWindowSize(new(Window.Width, 100));
             ImGui.Begin("Settings", ImGuiWindowFlags.NoMove | ImGuiWindowFlags.NoResize | ImGuiWindowFlags.NoCollapse);
             
-            ImGui.Text("Player to track: ");
-            ImGui.SameLine();
-            ImGui.InputText("", ref EngineManager.CurrentlyTrackedPlayerName, 32);
+            if (EngineManager.PlrFileTracker != null)
+            {
+                ImGui.Text("Player to track: ");
+                ImGui.SameLine();
+                ImGui.InputText("", ref EngineManager.CurrentlyTrackedPlayerName, 32);
+
+                if (ImGui.Button("Force update from file"))
+                    EngineManager.PlrFileTracker.UpdateFromFile(EngineManager.CurrentlyTrackedPlayerName + ".plr",
+                        Path.Combine(MiscTerrariaMethods.GetSavePath(), "Players", EngineManager.CurrentlyTrackedPlayerName + ".plr"));
+            } 
 
             ImGui.Text("Theme:");
             ImGui.SameLine();
@@ -130,11 +167,11 @@ namespace Zeus
             if (!EngineManager.Initialized)
             {
                 if (ImGui.Button("Initialize Mode A."))
-                    ;
+                    EngineManager.InitializeModeA();
 
                 ImGui.SameLine();
-                if (ImGui.Button("Initialize Mode B."))
-                    ;
+                if (ImGui.Button("Initialize Mode B (WIP)."))
+                    EngineManager.InitializeModeB();
             }
 
             ImGui.End();
